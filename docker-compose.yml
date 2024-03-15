@@ -3,5 +3,9 @@ services:
   ALL-TEXT_EVAL:
     image: all-text-eval-app
     ports:
-      - '5001:5001'
+      - '0.0.0.0:5000:5000'
     restart: always
+
+networks:
+  ai-network:
+    driver: bridge
