@@ -218,6 +218,8 @@ def split_into_phonemes(token):
     return ph_list
 
 def identify_missing_tokens(orig_text, resp_text):
+    if resp_text == None:
+        resp_text = ""
     orig_word_list = orig_text.split()
     resp_word_list = resp_text.split()
     construct_word_list =[]
@@ -230,10 +232,10 @@ def identify_missing_tokens(orig_text, resp_text):
     for word in orig_word_list:
         #use similarity algo euclidean distance and add them, if there is no direct match
         closest_match, similarity_score = find_closest_match(word, resp_text)
-        #print(f"word:{word}: closest match: {closest_match}: sim score:{similarity_score}")
+        print(f"word:{word}: closest match: {closest_match}: sim score:{similarity_score}")
         p_word = p.convert(word)
         print(f"word - {word}:: phonemes - {p_word}")#p_word = split_into_phonemes(p_word)
-        if similarity_score > 80:
+        if closest_match != None and (similarity_score > 80 or len(orig_word_list) == 1):
             #print("matched word")
             construct_word_list.append(closest_match)
             p_closest_match = p.convert(closest_match)
@@ -256,6 +258,16 @@ def identify_missing_tokens(orig_text, resp_text):
         missing_flatList = list(set(missing_flatList))
         construct_flatList = list(set(construct_flatList))
 
+        #For words like pew and few, we are adding to construct word and
+        # we just need to eliminate the matching phonemes and
+        # add missing phonemes into missing list
+        for m in orig_flatList:
+            print(m, " in construct phonemelist")
+            if m not in construct_flatList:
+                missing_flatList.append(m)
+                print('adding to missing list', m)
+        missing_flatList = list(set(missing_flatList))
+
         print(f"orig Text: {orig_text}")
         print(f"Resp Text: {resp_text}")
         print(f"construct Text: {construct_text}")
@@ -265,8 +277,8 @@ def identify_missing_tokens(orig_text, resp_text):
         print(f"Construct phonemes: {construct_phoneme_list}")
 
         #print(f"flat Construct phonemes: {construct_flatList}")
-        print(f"missing phonemes: {missing_phoneme_list}")
-        #print(f"flat missing phonemes: {missing_flatList}")
+        #print(f"missing phonemes: {missing_phoneme_list}")
+        print(f"flat missing phonemes: {missing_flatList}")
     return construct_flatList, missing_flatList,construct_text
 
 def processLP(orig_text, resp_text):
@@ -331,10 +343,9 @@ def get_phonemes():
     text = data.get('text')
 
     phonemesList = split_into_phonemes(p.convert(text))
-    uniquePhonemesList = list(dict.fromkeys(phonemesList))
 
     return jsonify({
-        "phonemes": uniquePhonemesList
+        "phonemes": phonemesList
     })
 
 if __name__ == '__main__':
