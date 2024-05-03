@@ -7,6 +7,10 @@ from pydub.silence import detect_silence
 import jiwer
 import eng_to_ipa as p
 from fuzzywuzzy import fuzz
+import librosa
+import numpy as np
+import soundfile as sf
+import noisereduce as nr
 
 app = Flask(__name__)
 
@@ -67,6 +71,126 @@ english_phoneme = ["b",
 "y",
 "a", "x", "c"
 ]
+@app.route('/audio_processing', methods=['POST'])
+def home():
+    data = request.json
+    if data:
+        audio_base64 = data.get('audio_base64')
+        if audio_base64:
+            # Convert base64 audio to audio data
+            audio_data = base64.b64decode(audio_base64)
+            audio_io = BytesIO(audio_data)
+
+            # Proceed with existing process
+            denoised_audio, sample_rate, initial_snr, final_snr = denoise_audio(audio_io, speed_factor=0.75)
+            denoised_audio_base64 = convert_to_base64(denoised_audio, sample_rate)
+
+            # Delete audio data from cache
+            del audio_data
+            del audio_io
+
+            return jsonify({"denoised_audio_base64": denoised_audio_base64}), 200
+        else:
+            return jsonify({"error": "Missing audio_base64 parameter."}), 400
+    else:
+        return jsonify({"error": "No data received."}), 400
+
+def calculate_snr(audio, sr):
+    n_fft = min(len(audio), 2048)  # Ensure n_fft does not exceed the length of the audio
+    stft = librosa.stft(audio, n_fft=n_fft)
+    power = np.abs(stft)**2
+
+    mel_spectrogram = librosa.feature.melspectrogram(S=power, sr=sr)
+    mel_power = np.mean(mel_spectrogram, axis=0)
+
+    energy_threshold = np.mean(mel_power)
+    speech_indices = mel_power > energy_threshold
+    noise_indices = ~speech_indices
+
+    signal_power = np.mean(power[:, speech_indices], axis=1)
+    average_signal_power = np.mean(signal_power) if signal_power.size > 0 else 0
+
+    noise_power = np.mean(power[:, noise_indices], axis=1)
+    average_noise_power = np.mean(noise_power) if noise_power.size > 0 else 1e-10
+
+    snr = 10 * np.log10(average_signal_power / average_noise_power) if average_signal_power > 0 else 0
+    return snr
+
+def estimate_noise_floor(audio, sr, frame_length=None, hop_length=512):
+    frame_length = frame_length or min(len(audio), 2048)
+    stft = librosa.stft(audio, n_fft=frame_length, hop_length=hop_length)
+    power_spectrogram = np.abs(stft)**2
+    energy = np.sum(power_spectrogram, axis=0)
+
+    low_energy_threshold = np.percentile(energy, 10)
+    very_low_energy = energy[energy <= low_energy_threshold]
+
+    adaptive_percentile = 5 if len(very_low_energy) < len(energy) * 0.1 else 10
+    noise_floor = np.percentile(energy, adaptive_percentile)
+
+    return noise_floor
+
+def denoise_audio(filepath, speed_factor=1.0):
+    audio, sample_rate = librosa.load(filepath, sr=None)
+    
+    # Apply time stretching first if the speed factor is not 1.0
+    if speed_factor != 1.0:
+        audio = librosa.effects.time_stretch(audio, rate=speed_factor)
+
+    # Calculate initial full audio SNR
+    initial_snr = calculate_snr(audio, sample_rate)
+    
+    # Improved VAD
+    vad_intervals = librosa.effects.split(audio, top_db=20)
+    noise_floor = estimate_noise_floor(audio, sample_rate)
+    
+    noise_reduced_audio = np.copy(audio)
+    improved_intervals = False  # Flag to track if any intervals improved SNR
+
+    for interval in vad_intervals:
+        interval_audio = audio[interval[0]:interval[1]]
+        interval_snr = calculate_snr(interval_audio, sample_rate)
+
+        # Determine reduction intensity based on initial SNR
+        reduction_intensity = determine_reduction_intensity(initial_snr)
+
+        # Apply noise reduction
+        reduced_interval_audio = nr.reduce_noise(y=interval_audio, sr=sample_rate, prop_decrease=reduction_intensity)
+        
+        # Calculate SNR after noise reduction
+        reduced_interval_snr = calculate_snr(reduced_interval_audio, sample_rate)
+        if reduced_interval_snr > interval_snr:
+            noise_reduced_audio[interval[0]:interval[1]] = reduced_interval_audio
+            improved_intervals = True
+        else:
+            print("No SNR improvement; keeping original audio for this interval.")
+
+    # Calculate final SNR and decide which version to use based on SNR comparison
+    final_snr = calculate_snr(noise_reduced_audio, sample_rate)
+    if not improved_intervals or final_snr < initial_snr:
+        final_snr = initial_snr  # Revert to original SNR if no improvement
+        noise_reduced_audio = audio  # Revert to original audio
+
+    normalized_audio = librosa.util.normalize(noise_reduced_audio)
+    return normalized_audio, sample_rate, initial_snr, final_snr
+
+def determine_reduction_intensity(snr):
+    if snr < 10:
+        return 0.7
+    elif snr < 15:
+        return 0.5
+    elif snr < 20:
+        return 0.22 
+    elif snr >= 30:
+        return 0.1
+    return 0.1  # Default to the least aggressive reduction if no specific conditions are met
+
+def convert_to_base64(audio_data, sample_rate):
+    buffer = io.BytesIO()
+    sf.write(buffer, audio_data, sample_rate, format='wav')
+    buffer.seek(0)
+    base64_audio = base64.b64encode(buffer.read()).decode('utf-8')
+    return base64_audio
 
 def get_error_arrays(alignments, reference, hypothesis, base64string):
     insertion = []
