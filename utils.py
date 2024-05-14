@@ -111,18 +111,22 @@ def convert_to_base64(audio_data, sample_rate):
     base64_audio = base64.b64encode(buffer.read()).decode('utf-8')
     return base64_audio
 
+def get_error_arrays(alignments, reference, hypothesis, base64strings):
+     import base64
+import io
+from pydub import AudioSegment
+from pydub.silence import detect_silence
+
 def get_error_arrays(alignments, reference, hypothesis, base64string):
-    insertion = []
-    deletion = []
+    insertion_chars = set()
+    deletion_chars = set()
     substitution = []
 
     for chunk in alignments[0]:
         if chunk.type == 'insert':
-            insertion.extend(
-                list(range(chunk.hyp_start_idx, chunk.hyp_end_idx)))
+            insertion_chars.update(range(chunk.hyp_start_idx, chunk.hyp_end_idx))
         elif chunk.type == 'delete':
-            deletion.extend(
-                list(range(chunk.ref_start_idx, chunk.ref_end_idx)))
+            deletion_chars.update(range(chunk.ref_start_idx, chunk.ref_end_idx))
         elif chunk.type == 'substitute':
             refslice = slice(chunk.ref_start_idx, chunk.ref_end_idx)
             hyposlice = slice(chunk.hyp_start_idx, chunk.hyp_end_idx)
@@ -132,31 +136,30 @@ def get_error_arrays(alignments, reference, hypothesis, base64string):
                 "replaced": reference[refslice]
             })
 
-    insertion_chars = [hypothesis[i] for i in insertion]
-    deletion_chars = [reference[i] for i in deletion]
-
-    # For count the pauses in audio files
+    # Load audio data from base64 string
     audio_data = base64.b64decode(base64string)
-
-    # Use pydub to load the audio from the BytesIO object
     audio_segment = AudioSegment.from_file(io.BytesIO(audio_data))
 
     # Check if the audio is completely silent or empty
     silence_ranges = detect_silence(
         audio_segment, min_silence_len=500, silence_thresh=-40)
 
+    # Count pause occurrences
     if len(silence_ranges) == 1 and silence_ranges[0] == [0, len(audio_segment)]:
         pause_count = 0
     else:
-        # Count pause occurrences
         pause_count = len(silence_ranges)
 
-    return {
-        'insertion': insertion_chars,
-        'deletion': deletion_chars,
+    # Prepare the result dictionary
+    result = {
+        'insertion': [hypothesis[i] for i in insertion_chars],
+        'deletion': [reference[i] for i in deletion_chars],
         'substitution': substitution,
         'pause_count': pause_count
     }
+
+    return result
+
 
 def find_closest_match(target_word, input_string):
     # Tokenize the input string into words
@@ -251,7 +254,7 @@ def split_into_phonemes(token):
             elif (p[i] in english_phoneme):
                 ph_list.append(p[i])
             else:
-                print(f"Not part of 44 phonemes: {p[i]}")
+                # print(f"Not part of 44 phonemes: {p[i]}")
                 if p[i] not in anamoly_list.keys():
                     anamoly_list[p[i]] = 1
                 else:
@@ -276,9 +279,9 @@ def identify_missing_tokens(orig_text, resp_text):
     for word in orig_word_list:
         #use similarity algo euclidean distance and add them, if there is no direct match
         closest_match, similarity_score = find_closest_match(word, resp_text)
-        print(f"word:{word}: closest match: {closest_match}: sim score:{similarity_score}")
+        # print(f"word:{word}: closest match: {closest_match}: sim score:{similarity_score}")
         p_word = p.convert(word)
-        print(f"word - {word}:: phonemes - {p_word}")#p_word = split_into_phonemes(p_word)
+        # print(f"word - {word}:: phonemes - {p_word}")#p_word = split_into_phonemes(p_word)
         if closest_match != None and (similarity_score > 80 or len(orig_word_list) == 1):
             #print("matched word")
             construct_word_list.append(closest_match)
@@ -286,7 +289,7 @@ def identify_missing_tokens(orig_text, resp_text):
             construct_phoneme_list.append(split_into_phonemes(p_closest_match))
             construct_text += closest_match + ' '
         else:
-            print(f"no match for - {word}: closest match: {closest_match}: sim score:{similarity_score}")
+            # print(f"no match for - {word}: closest match: {closest_match}: sim score:{similarity_score}")
             missing_word_list.append(word)
             missing_phoneme_list.append(split_into_phonemes(p_word))
         index = index+1
@@ -306,29 +309,29 @@ def identify_missing_tokens(orig_text, resp_text):
         # we just need to eliminate the matching phonemes and
         # add missing phonemes into missing list
         for m in orig_flatList:
-            print(m, " in construct phonemelist")
+            # print(m, " in construct phonemelist")
             if m not in construct_flatList:
                 missing_flatList.append(m)
-                print('adding to missing list', m)
+                # print('adding to missing list', m)
         missing_flatList = list(set(missing_flatList))
 
-        print(f"orig Text: {orig_text}")
-        print(f"Resp Text: {resp_text}")
-        print(f"construct Text: {construct_text}")
+        # print(f"orig Text: {orig_text}")
+        # print(f"Resp Text: {resp_text}")
+        # print(f"construct Text: {construct_text}")
 
-        print(f"original phonemes: {orig_phoneme_list}")
+        # print(f"original phonemes: {orig_phoneme_list}")
         #print(f"flat original phonemes: {orig_flatList}")
-        print(f"Construct phonemes: {construct_phoneme_list}")
+        #print(f"Construct phonemes: {construct_phoneme_list}")
 
         #print(f"flat Construct phonemes: {construct_flatList}")
         #print(f"missing phonemes: {missing_phoneme_list}")
-        print(f"flat missing phonemes: {missing_flatList}")
+        # print(f"flat missing phonemes: {missing_flatList}")
     return construct_flatList, missing_flatList,construct_text
 
 def processLP(orig_text, resp_text):
     cons_list, miss_list,construct_text = identify_missing_tokens(orig_text, resp_text)
-    print(f"constructed list:{cons_list}")
-    print(f"missed list:{miss_list}")
+    # print(f"constructed list:{cons_list}")
+    # print(f"missed list:{miss_list}")
 
     #remove phonemes from miss_list which are in cons_list, ?but add those phonemes a count of could be issue
 
@@ -338,8 +341,8 @@ def processLP(orig_text, resp_text):
     for c in miss_list:
         if c not in cons_list:
             unfamiliar_list.append(c)
-    print(f"Not Familiar with:{unfamiliar_list}")
-    print( f"Anomaly list: {anamoly_list}")
+    # print(f"Not Familiar with:{unfamiliar_list}")
+    # print( f"Anomaly list: {anamoly_list}")
     return cons_list, miss_list,construct_text
     #function to calculate wer cer, substitutions, deletions and insertions, silence, repetitions
     #insert into DB the LearnerProfile vector
