@@ -111,17 +111,11 @@ def convert_to_base64(audio_data, sample_rate):
     base64_audio = base64.b64encode(buffer.read()).decode('utf-8')
     return base64_audio
 
-def get_error_arrays(alignments, reference, hypothesis, base64strings):
-     import base64
-import io
-from pydub import AudioSegment
-from pydub.silence import detect_silence
-
-def get_error_arrays(alignments, reference, hypothesis, base64string):
-    insertion_chars = set()
-    deletion_chars = set()
+def get_error_arrays(alignments, reference, hypothesis):
+    insertion_chars = []
+    deletion_chars = []
     substitution = []
-
+    result = []
     for chunk in alignments[0]:
         if chunk.type == 'insert':
             insertion_chars.update(range(chunk.hyp_start_idx, chunk.hyp_end_idx))
@@ -135,9 +129,16 @@ def get_error_arrays(alignments, reference, hypothesis, base64string):
                 "removed": hypothesis[hyposlice],
                 "replaced": reference[refslice]
             })
+        result = {
+        'insertion': [hypothesis[i] for i in insertion_chars],
+        'deletion': [reference[i] for i in deletion_chars],
+        'substitution': substitution,
+    }
 
+    return result
+
+def get_pause_count(audio_data):
     # Load audio data from base64 string
-    audio_data = base64.b64decode(base64string)
     audio_segment = AudioSegment.from_file(io.BytesIO(audio_data))
 
     # Check if the audio is completely silent or empty
@@ -150,17 +151,8 @@ def get_error_arrays(alignments, reference, hypothesis, base64string):
     else:
         pause_count = len(silence_ranges)
 
-    # Prepare the result dictionary
-    result = {
-        'insertion': [hypothesis[i] for i in insertion_chars],
-        'deletion': [reference[i] for i in deletion_chars],
-        'substitution': substitution,
-        'pause_count': pause_count
-    }
-
-    return result
-
-
+    return pause_count
+   
 def find_closest_match(target_word, input_string):
     # Tokenize the input string into words
     words = input_string.lower().split()

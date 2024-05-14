@@ -7,8 +7,6 @@ class TextData(BaseModel):
     language: str
 
 class audioData(BaseModel):
-    reference: str
-    hypothesis: str
     base64_string: str
 
 class PhonemesRequest(BaseModel):
