@@ -11,7 +11,7 @@ import numpy as np
 import soundfile as sf
 import noisereduce as nr
 
-english_phoneme = ["b", "d", "f", "g", "h", "ʤ", "k", "l", "m", "n", "p", "r", "s", "t", "v", "w", "z", "ʒ", "tʃ", "ʃ", "θ", "ð", "ŋ", "j", "æ", "eɪ", "ɛ", "i:", "ɪ", "aɪ", "ɒ", "oʊ", "ʊ", "ʌ", "u:", "ɔɪ", "aʊ", "ə", "eəʳ", "ɑ:", "ɜ:ʳ", "ɔ:", "ɪəʳ", "ʊəʳ", "i", "u", "ɔ", "ɑ", "ɜ", "e", "ʧ", "o", "y", "a", "x", "c"]
+english_phoneme = ["b","d","f","g","h","ʤ","k","l","m","n","p","r","s","t","v","w","z","ʒ","tʃ","ʃ","θ","ð","ŋ","j","æ","eɪ","ɛ","i:","ɪ","aɪ","ɒ","oʊ","ʊ","ʌ","u:","ɔɪ","aʊ","ə","eəʳ","ɑ:","ɜ:ʳ","ɔ:","ɪəʳ","ʊəʳ","i","u","ɔ","ɑ","ɜ","e","ʧ","o","y","a", "x", "c"]
 anamoly_list = {}
 
 def calculate_snr(audio, sr):
@@ -97,7 +97,7 @@ def determine_reduction_intensity(snr):
     if snr < 10:
         return 0.7
     elif snr < 15:
-        return 0.5
+        return 0.5  
     elif snr < 20:
         return 0.22
     elif snr >= 30:
@@ -155,180 +155,135 @@ def get_error_arrays(alignments, reference, hypothesis, base64string):
         'insertion': insertion_chars,
         'deletion': deletion_chars,
         'substitution': substitution,
-        'pause_count': pause_count
+        'pause_count': 0
     }
 
 def find_closest_match(target_word, input_string):
     # Tokenize the input string into words
     words = input_string.lower().split()
-
+    targ = target_word.lower()
     # Initialize variables to keep track of the best match
     best_match = None
     best_score = 0
-
+    
     # Iterate through the words in the input string
     for word in words:
-        similarity_score = fuzz.ratio(target_word.lower(), word)
-
+        similarity_score = fuzz.ratio(targ, word)
+        
         # Update the best match if a higher score is found
         if similarity_score > best_score:
             best_score = similarity_score
             best_match = word
-
+    
     return best_match, best_score
 
 @lru_cache(maxsize=None)
 def split_into_phonemes(token):
-    ph_list = []
-    spl_phone = False
-    word_list = token.split()#split by space and .
-    #now split using the ' notation
-    for p in word_list:
-        #print(ph_l)
-        #ph_l = w.split("ˈ")
-        #print(f"ph_l after split is: {ph_l}")
-        #print(p[0])
+    # Phoneme mapping for combined phonemes
+    combined_phonemes = {
+        "dʒ": "ʤ",
+        "tʃ": "ʧ",
+        "ɪəʳ": "ɪəʳ",
+        "ʊəʳ": "ʊəʳ",
+        "eɪʳ": "eɪ",
+        "aɪ": "aɪ",
+        "oʊ": "o",
+        "ɔɪ": "ɔɪ",
+        "aʊ": "aʊ",
+        "eəʳ": "eəʳ",
+        "ɑ:": "ɑ",
+        "ɜ:ʳ": "ɜ:ʳ",
+        "ɔ:": "ɔ:",
+        "i:": "i",
+    }
+    
+    # Set of characters to skip (stress marks, etc.)
+    skip_chars = {"'", " ", "ˈ", "ˌ"}
 
+    # Convert the english_phoneme list into a set for O(1) average-time complexity checks
+    english_phoneme_set = set(english_phoneme)
+    
+    ph_list = []
+    word_list = token.split()  # split by whitespace (space, tab, newline, etc.)
+
+    for p in word_list:
         size = len(p)
-        for i in range(size):
-            #print(f"second for loop {p[i]}")
-            if (p[i]=="'" or p[i] == " " or p[i]=="ˈ" or p[i]=="ˌ"):
-                #it is just a notation for primary stress
-                #print("found a special phoneme {spl_phone}")
-                #do nothing
-                print("just filler")
-            elif (p[i] == "d" and size > i+1 and p[i+1] == "ʒ"):
-                ph_list.append("ʤ")
-                i = i+1
-            elif (p[i]=="t" and size > i+1 and p[i+1]=="ʃ"):
-                ph_list.append("tʃ")
-                i = i+1
-            elif (p[i]=="ɪ" and size > i+2 and p[i+1] == "ə" and p[i+2] == "ʳ"):
-                ph_list.append("ɪəʳ")
-                i = i+2
-            elif (p[i]=="ʊ" and size > i+2 and p[i+1] == "ə" and p[i+2] == "ʳ"):
-                ph_list.append("ʊəʳ")
-                i = i+2
-            elif (p[i]=="e" and size > i+2 and p[i+1]=="ɪ" and p[i+2]=="ʳ"):
-                ph_list.append("eɪʳ")
-                i = i+2
-            elif (p[i]=="a" and size > i+1 and p[i+1]=="ɪ"):#aɪ
-                ph_list.append("aɪ")
-                i = i+1
-            elif (p[i]=="o" and size > i+1 and p[i+1]=="ʊ"):#aɪ
-                ph_list.append("oʊ")
-                i = i+1
-            elif (p[i]=="ɔ" and size > i+1 and p[i+1]=="ɪ"):#aɪ
-                ph_list.append("ɔɪ")
-                i = i+1
-            elif (p[i]=="a" and size > i+1 and p[i+1]=="ʊ"):#aɪ
-                ph_list.append("aʊ")
-                i = i+1
-            elif (p[i]=="e" and size > i+2 and p[i+1]=="ə" and p[i+2] == "ʳ"):#aɪ
-                ph_list.append("eəʳ")
-                i = i+2
-            elif (p[i]=="ɑ" and size > i+1 and p[i+1]==":"):#aɪ
-                ph_list.append("ɑ:")
-                i = i+1
-            elif (p[i]=="ɜ" and size > i+2 and p[i+1]==":" and p[i+2] == "ʳ"):#aɪ
-                ph_list.append("ɜ:ʳ")
-                i = i+2
-            elif (p[i]=="ɔ" and size > i+1 and p[i+1]==":"):#aɪ
-                ph_list.append("ɔ:")
-                i = i+1
-            elif (p[i]=="ɑ" and size > i+1 and p[i+1]==":"):#aɪ
-                ph_list.append("ɑ:")
-                i = i+1
-            elif (p[i]=="ɪ" and size > i+2 and p[i+1]=="ə" and p[i+2] == "ʳ"):#ɪəʳ
-                ph_list.append("ɪəʳ")
-                i = i+2
-            elif (p[i]=="ʊ" and size > i+2 and p[i+1]=="ə" and p[i+2]=="ʳ"):#ʊəʳ
-                ph_list.append("ʊəʳ")
-                i = i+2
-            elif (p[i]=="i" and size > i+1 and p[i+1]==":"):
-                ph_list.append("i:")
-                i = i+1
-            elif (p[i] in english_phoneme):
-                ph_list.append(p[i])
+        i = 0
+        while i < size:
+            if p[i] in skip_chars:
+                i += 1
+                continue
+
+            # Check for combined phonemes first (3 then 2 characters long)
+            if i + 3 <= size and p[i:i+3] in combined_phonemes:
+                ph_list.append(combined_phonemes[p[i:i+3]])
+                i += 3
+            elif i + 2 <= size and p[i:i+2] in combined_phonemes:
+                ph_list.append(combined_phonemes[p[i:i+2]])
+                i += 2
+            elif i + 1 <= size and p[i:i+1] in english_phoneme_set:
+                ph_list.append(p[i:i+1])
+                i += 1
             else:
-                print(f"Not part of 44 phonemes: {p[i]}")
-                if p[i] not in anamoly_list.keys():
+                # Log an anomaly if the character isn't recognized
+                ph_list.append(p[i])
+                if p[i] not in anamoly_list:
                     anamoly_list[p[i]] = 1
                 else:
-                    count = anamoly_list[p[i]]
-                    anamoly_list[p[i]] = count + 1 # add another count to the global dictionary
-        #print(f"out of second loop {ph_list}")
-    #print(f"phonemes for the word - {token} is {ph_list}")
+                    anamoly_list[p[i]] += 1
+                i += 1
+
     return ph_list
 
 def identify_missing_tokens(orig_text, resp_text):
-    if resp_text == None:
-        resp_text = ""
-    orig_word_list = orig_text.split()
-    resp_word_list = resp_text.split()
-    construct_word_list =[]
-    missing_word_list=[]
+    # Splitting text into words
+    orig_word_list = orig_text.lower().split()
+    resp_word_list = resp_text.lower().split()
+    
+    # Initialize lists and dictionaries
+    construct_word_list = []
+    missing_word_list = []
     orig_phoneme_list = []
     construct_phoneme_list = []
-    missing_phoneme_list =[]
-    construct_text=''
-    index=0
+    missing_phoneme_list = []
+    construct_text = []
+    
+    # Precompute phonemes for response words for quick lookup
+    resp_phonemes = {word: p.convert(word) for word in resp_word_list}
+    print("resp_phoneme::", resp_phonemes)
     for word in orig_word_list:
-        #use similarity algo euclidean distance and add them, if there is no direct match
-        closest_match, similarity_score = find_closest_match(word, resp_text)
-        print(f"word:{word}: closest match: {closest_match}: sim score:{similarity_score}")
+        # Precompute original word phonemes
         p_word = p.convert(word)
-        print(f"word - {word}:: phonemes - {p_word}")#p_word = split_into_phonemes(p_word)
-        if closest_match != None and (similarity_score > 80 or len(orig_word_list) == 1):
-            #print("matched word")
+        
+        # Find closest match based on precomputed phonemes to avoid redundant calculations
+        closest_match, similarity_score = find_closest_match(word, resp_text)
+        
+        # Check similarity and categorize word
+        if similarity_score > 80:
             construct_word_list.append(closest_match)
-            p_closest_match = p.convert(closest_match)
+            p_closest_match = resp_phonemes[closest_match]
             construct_phoneme_list.append(split_into_phonemes(p_closest_match))
-            construct_text += closest_match + ' '
+            construct_text.append(closest_match)
         else:
-            print(f"no match for - {word}: closest match: {closest_match}: sim score:{similarity_score}")
             missing_word_list.append(word)
-            missing_phoneme_list.append(split_into_phonemes(p_word))
-        index = index+1
+            p_word_phonemes = split_into_phonemes(p_word)
+            missing_phoneme_list.append(p_word_phonemes)
+        
+        # Store original phonemes for each word
         orig_phoneme_list.append(split_into_phonemes(p_word))
 
-        # iterate through the sublist using List comprehension to flatten the nested list to single list
-        orig_flatList = [element for innerList in orig_phoneme_list for element in innerList]
-        missing_flatList = [element for innerList in missing_phoneme_list for element in innerList]
-        construct_flatList = [element for innerList in construct_phoneme_list for element in innerList]
+    # Convert list of words to a single string
+    construct_text = ' '.join(construct_text)
 
-        # ensure duplicates are removed and only unique set are available
-        orig_flatList = list(set(orig_flatList))
-        missing_flatList = list(set(missing_flatList))
-        construct_flatList = list(set(construct_flatList))
+    # Efficiently deduplicate and flatten phoneme lists
+    #orig_flatList = set(phoneme for sublist in orig_phoneme_list for phoneme in sublist)
+    missing_flatList = set(phoneme for sublist in missing_phoneme_list for phoneme in sublist)
+    construct_flatList = set(phoneme for sublist in construct_phoneme_list for phoneme in sublist)
 
-        #For words like pew and few, we are adding to construct word and
-        # we just need to eliminate the matching phonemes and
-        # add missing phonemes into missing list
-        for m in orig_flatList:
-            print(m, " in construct phonemelist")
-            if m not in construct_flatList:
-                missing_flatList.append(m)
-                print('adding to missing list', m)
-        missing_flatList = list(set(missing_flatList))
-
-        print(f"orig Text: {orig_text}")
-        print(f"Resp Text: {resp_text}")
-        print(f"construct Text: {construct_text}")
-
-        print(f"original phonemes: {orig_phoneme_list}")
-        #print(f"flat original phonemes: {orig_flatList}")
-        print(f"Construct phonemes: {construct_phoneme_list}")
-
-        #print(f"flat Construct phonemes: {construct_flatList}")
-        #print(f"missing phonemes: {missing_phoneme_list}")
-        print(f"flat missing phonemes: {missing_flatList}")
-    return construct_flatList, missing_flatList,construct_text
+    return list(construct_flatList), list(missing_flatList) ,construct_text
 
 def processLP(orig_text, resp_text):
-    cons_list, miss_list,construct_text = identify_missing_tokens(orig_text, resp_text)
-    print(f"constructed list:{cons_list}")
-    print(f"missed list:{miss_list}")
+    cons_list, miss_list, construct_text = identify_missing_tokens(orig_text, resp_text)
 
     #remove phonemes from miss_list which are in cons_list, ?but add those phonemes a count of could be issue
 
@@ -338,8 +293,6 @@ def processLP(orig_text, resp_text):
     for c in miss_list:
         if c not in cons_list:
             unfamiliar_list.append(c)
-    print(f"Not Familiar with:{unfamiliar_list}")
-    print( f"Anomaly list: {anamoly_list}")
-    return cons_list, miss_list,construct_text
     #function to calculate wer cer, substitutions, deletions and insertions, silence, repetitions
     #insert into DB the LearnerProfile vector
+    return cons_list, miss_list,construct_text
