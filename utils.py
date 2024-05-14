@@ -155,7 +155,7 @@ def get_error_arrays(alignments, reference, hypothesis, base64string):
         'insertion': insertion_chars,
         'deletion': deletion_chars,
         'substitution': substitution,
-        'pause_count': 0
+        'pause_count': pause_count
     }
 
 def find_closest_match(target_word, input_string):
