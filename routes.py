@@ -39,7 +39,6 @@ async def compute_errors(data: TextData):
         "deletion_count": len(error_arrays['deletion']),
         "substitution": error_arrays['substitution'],
         "substitution_count": len(error_arrays['substitution']),
-        # "pause_count": error_arrays['pause_count'],
         "confidence_char_list":confidence_char_list,
         "missing_char_list":missing_char_list,
         "construct_text":construct_text
@@ -52,9 +51,6 @@ async def get_phonemes(data: PhonemesRequest):
 
 @router.post('/audio_processing')
 async def audio_processing(data: audioData):
-
-    base64_string = data.base64_string
-    
     if data.base64_string:
         audio_base64_string = data.base64_string
         if audio_base64_string:
@@ -62,7 +58,7 @@ async def audio_processing(data: audioData):
             audio_data = base64.b64decode(audio_base64_string)
             audio_io = BytesIO(audio_data)
  
-            pause_count = get_pause_count(audio_data)
+            pause_count = get_pause_count(audio_io)
 
             # Proceed with existing process
             denoised_audio, sample_rate, initial_snr, final_snr = denoise_audio(audio_io, speed_factor=0.75)

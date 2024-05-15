@@ -112,15 +112,17 @@ def convert_to_base64(audio_data, sample_rate):
     return base64_audio
 
 def get_error_arrays(alignments, reference, hypothesis):
-    insertion_chars = []
-    deletion_chars = []
+    insertion = []
+    deletion = []
     substitution = []
-    result = []
+
     for chunk in alignments[0]:
         if chunk.type == 'insert':
-            insertion_chars.update(range(chunk.hyp_start_idx, chunk.hyp_end_idx))
+            insertion.extend(
+                list(range(chunk.hyp_start_idx, chunk.hyp_end_idx)))
         elif chunk.type == 'delete':
-            deletion_chars.update(range(chunk.ref_start_idx, chunk.ref_end_idx))
+            deletion.extend(
+                list(range(chunk.ref_start_idx, chunk.ref_end_idx)))
         elif chunk.type == 'substitute':
             refslice = slice(chunk.ref_start_idx, chunk.ref_end_idx)
             hyposlice = slice(chunk.hyp_start_idx, chunk.hyp_end_idx)
@@ -129,17 +131,20 @@ def get_error_arrays(alignments, reference, hypothesis):
                 "removed": hypothesis[hyposlice],
                 "replaced": reference[refslice]
             })
-        result = {
-        'insertion': [hypothesis[i] for i in insertion_chars],
-        'deletion': [reference[i] for i in deletion_chars],
-        'substitution': substitution,
+
+    insertion_chars = [hypothesis[i] for i in insertion]
+    deletion_chars = [reference[i] for i in deletion]
+
+    return {
+        'insertion': insertion_chars,
+        'deletion': deletion_chars,
+        'substitution': substitution, 
     }
 
-    return result
 
-def get_pause_count(audio_data):
+def get_pause_count(audio_io):
     # Load audio data from base64 string
-    audio_segment = AudioSegment.from_file(io.BytesIO(audio_data))
+    audio_segment = AudioSegment.from_file((audio_io))
 
     # Check if the audio is completely silent or empty
     silence_ranges = detect_silence(
@@ -152,6 +157,7 @@ def get_pause_count(audio_data):
         pause_count = len(silence_ranges)
 
     return pause_count
+
    
 def find_closest_match(target_word, input_string):
     # Tokenize the input string into words
