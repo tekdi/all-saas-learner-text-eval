@@ -132,18 +132,17 @@ def estimate_noise_floor(audio, sr, frame_length=None, hop_length=512):
 
 def denoise_audio(filepath, speed_factor=1.0):
     audio, sample_rate = librosa.load(filepath, sr=None)
-    
     # Apply time stretching first if the speed factor is not 1.0
     if speed_factor != 1.0:
         audio = librosa.effects.time_stretch(audio, rate=speed_factor)
 
     # Calculate initial full audio SNR
     initial_snr = calculate_snr(audio, sample_rate)
-    
+
     # Improved VAD
     vad_intervals = librosa.effects.split(audio, top_db=20)
     noise_floor = estimate_noise_floor(audio, sample_rate)
-    
+
     noise_reduced_audio = np.copy(audio)
     improved_intervals = False  # Flag to track if any intervals improved SNR
 
@@ -156,7 +155,7 @@ def denoise_audio(filepath, speed_factor=1.0):
 
         # Apply noise reduction
         reduced_interval_audio = nr.reduce_noise(y=interval_audio, sr=sample_rate, prop_decrease=reduction_intensity)
-        
+
         # Calculate SNR after noise reduction
         reduced_interval_snr = calculate_snr(reduced_interval_audio, sample_rate)
         if reduced_interval_snr > interval_snr:
@@ -180,7 +179,7 @@ def determine_reduction_intensity(snr):
     elif snr < 15:
         return 0.5
     elif snr < 20:
-        return 0.22 
+        return 0.22
     elif snr >= 30:
         return 0.1
     return 0.1  # Default to the least aggressive reduction if no specific conditions are met
@@ -342,68 +341,60 @@ def split_into_phonemes(token):
     return ph_list
 
 def identify_missing_tokens(orig_text, resp_text):
+# Splitting text into words
     if resp_text == None:
         resp_text = ""
-    orig_word_list = orig_text.split()
-    resp_word_list = resp_text.split()
-    construct_word_list =[]
-    missing_word_list=[]
+    orig_word_list = orig_text.lower().split()
+    resp_word_list = resp_text.lower().split()
+
+    # Initialize lists and dictionaries
+    construct_word_list = []
+    missing_word_list = []
     orig_phoneme_list = []
     construct_phoneme_list = []
-    missing_phoneme_list =[]
-    construct_text=''
-    index=0
+    missing_phoneme_list = []
+    construct_text = []
+
+    # Precompute phonemes for response words for quick lookup
+    resp_phonemes = {word: p.convert(word) for word in resp_word_list}
+
     for word in orig_word_list:
-        #use similarity algo euclidean distance and add them, if there is no direct match
-        closest_match, similarity_score = find_closest_match(word, resp_text)
-        print(f"word:{word}: closest match: {closest_match}: sim score:{similarity_score}")
+        # Precompute original word phonemes
         p_word = p.convert(word)
-        print(f"word - {word}:: phonemes - {p_word}")#p_word = split_into_phonemes(p_word)
-        if closest_match != None and (similarity_score > 80 or len(orig_word_list) == 1):
-            #print("matched word")
+
+        # Find closest match based on precomputed phonemes to avoid redundant calculations
+        closest_match, similarity_score = find_closest_match(word, resp_text)
+
+        # Check similarity and categorize word
+        if (closest_match != None) and (similarity_score >= 80 and len(orig_word_list) > 1) or (len(orig_word_list) == 1 and similarity_score >= 60):
             construct_word_list.append(closest_match)
-            p_closest_match = p.convert(closest_match)
+            p_closest_match = resp_phonemes[closest_match]
             construct_phoneme_list.append(split_into_phonemes(p_closest_match))
-            construct_text += closest_match + ' '
+            construct_text.append(closest_match)
         else:
-            print(f"no match for - {word}: closest match: {closest_match}: sim score:{similarity_score}")
             missing_word_list.append(word)
-            missing_phoneme_list.append(split_into_phonemes(p_word))
-        index = index+1
+            p_word_phonemes = split_into_phonemes(p_word)
+            missing_phoneme_list.append(p_word_phonemes)
+
+        # Store original phonemes for each word
         orig_phoneme_list.append(split_into_phonemes(p_word))
 
-        # iterate through the sublist using List comprehension to flatten the nested list to single list
-        orig_flatList = [element for innerList in orig_phoneme_list for element in innerList]
-        missing_flatList = [element for innerList in missing_phoneme_list for element in innerList]
-        construct_flatList = [element for innerList in construct_phoneme_list for element in innerList]
+    # Convert list of words to a single string
+    construct_text = ' '.join(construct_text)
 
-        # ensure duplicates are removed and only unique set are available
-        orig_flatList = list(set(orig_flatList))
-        missing_flatList = list(set(missing_flatList))
-        construct_flatList = list(set(construct_flatList))
+    # Efficiently deduplicate and flatten phoneme lists
+    orig_flatList = set(phoneme for sublist in orig_phoneme_list for phoneme in sublist)
+    #missing_flatList = set(phoneme for sublist in missing_phoneme_list for phoneme in sublist)
+    construct_flatList = set(phoneme for sublist in construct_phoneme_list for phoneme in sublist)
 
-        #For words like pew and few, we are adding to construct word and
-        # we just need to eliminate the matching phonemes and
-        # add missing phonemes into missing list
-        for m in orig_flatList:
-            print(m, " in construct phonemelist")
-            if m not in construct_flatList:
-                missing_flatList.append(m)
-                print('adding to missing list', m)
-        missing_flatList = list(set(missing_flatList))
-
-        print(f"orig Text: {orig_text}")
-        print(f"Resp Text: {resp_text}")
-        print(f"construct Text: {construct_text}")
-
-        print(f"original phonemes: {orig_phoneme_list}")
-        #print(f"flat original phonemes: {orig_flatList}")
-        print(f"Construct phonemes: {construct_phoneme_list}")
-
-        #print(f"flat Construct phonemes: {construct_flatList}")
-        #print(f"missing phonemes: {missing_phoneme_list}")
-        print(f"flat missing phonemes: {missing_flatList}")
-    return construct_flatList, missing_flatList,construct_text
+    #For words like pew and few, we are adding to construct word and
+    # we just need to eliminate the matching phonemes and
+    # add missing phonemes into missing list
+    for m in orig_flatList:
+        if m not in construct_flatList:
+            missing_phoneme_list.append(m)
+    missing_flatList = set(phoneme for sublist in missing_phoneme_list for phoneme in sublist)
+    return list(construct_flatList), list(missing_flatList),construct_text
 
 def processLP(orig_text, resp_text):
     cons_list, miss_list,construct_text = identify_missing_tokens(orig_text, resp_text)
