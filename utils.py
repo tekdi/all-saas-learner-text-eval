@@ -24,6 +24,7 @@ def denoise_with_rnnoise(audio_base64):
 
         # Construct the full model path
         model_path = "./audio_model/cb.rnnn"
+
         # Process the audio with RNNoise using ffmpeg
         output, _ = (
             ffmpeg
@@ -34,16 +35,17 @@ def denoise_with_rnnoise(audio_base64):
 
         # Convert the processed output back to base64
         denoised_audio_base64 = base64.b64encode(output).decode('utf-8')
-
+        
         # Clear cache
         del audio_data
         del audio_io
-        
+
         return denoised_audio_base64
+    
     except ffmpeg.Error as e:
         print(f"Error during noise reduction: {e.stderr.decode()}")
         return None
-                
+                 
 def convert_to_base64(audio_data, sample_rate):
     buffer = io.BytesIO()
     sf.write(buffer, audio_data, sample_rate, format='wav')
@@ -51,7 +53,7 @@ def convert_to_base64(audio_data, sample_rate):
     base64_audio = base64.b64encode(buffer.read()).decode('utf-8')
     return base64_audio
 
-def get_error_arrays(alignments, reference, hypothesis, base64string):
+def get_error_arrays(alignments, reference, hypothesis):
     insertion = []
     deletion = []
     substitution = []
@@ -75,28 +77,27 @@ def get_error_arrays(alignments, reference, hypothesis, base64string):
     insertion_chars = [hypothesis[i] for i in insertion]
     deletion_chars = [reference[i] for i in deletion]
 
-    # For count the pauses in audio files
-    audio_data = base64.b64decode(base64string)
-
-    # Use pydub to load the audio from the BytesIO object
-    audio_segment = AudioSegment.from_file(io.BytesIO(audio_data))
-
-    # Check if the audio is completely silent or empty
-    silence_ranges = detect_silence(
-        audio_segment, min_silence_len=500, silence_thresh=-40)
-
-    if len(silence_ranges) == 1 and silence_ranges[0] == [0, len(audio_segment)]:
-        pause_count = 0
-    else:
-        # Count pause occurrences
-        pause_count = len(silence_ranges)
-
     return {
         'insertion': insertion_chars,
         'deletion': deletion_chars,
-        'substitution': substitution,
-        'pause_count': pause_count
+        'substitution': substitution, 
     }
+
+def get_pause_count(audio_io):
+        # Run the FFmpeg command with the input from the byte stream
+        process = (
+            ffmpeg
+            .input('pipe:0')
+            .filter('silencedetect', noise='-40dB', duration=0.5)
+            .output('pipe:1', format='null')
+            .run_async(pipe_stdin=True, pipe_stdout=True, pipe_stderr=True)
+        )
+        # Write the audio data to the stdin of the FFmpeg process
+        stdout, stderr = process.communicate(input=audio_io.read())
+        # Parse the stderr output to count the silences
+        silence_lines = stderr.decode().split('\n')
+        silence_start_count = sum(1 for line in silence_lines if "silence_start" in line)
+        return silence_start_count
 
 def find_closest_match(target_word, input_string):
     # Tokenize the input string into words

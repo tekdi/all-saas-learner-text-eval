@@ -8,7 +8,9 @@ class TextData(BaseModel):
     language: str
 
 class audioData(BaseModel):
-    audio_base64: str
+    base64_string: str
+    enablePauseCount:bool
+    enableDenoiser:bool
 
 class PhonemesRequest(BaseModel):
     text: str
