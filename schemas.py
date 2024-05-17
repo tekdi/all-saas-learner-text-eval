@@ -8,6 +8,8 @@ class TextData(BaseModel):
 
 class audioData(BaseModel):
     base64_string: str
+    enablePauseCount:bool
+    enableDenoiser:bool
 
 class PhonemesRequest(BaseModel):
     text: str

@@ -1,5 +1,5 @@
 import base64
-from io import BytesIO
+import io
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from utils import convert_to_base64, denoise_audio, get_error_arrays, get_pause_count, split_into_phonemes, processLP
@@ -51,28 +51,26 @@ async def get_phonemes(data: PhonemesRequest):
 
 @router.post('/audio_processing')
 async def audio_processing(data: audioData):
-    if data.base64_string:
-        audio_base64_string = data.base64_string
-        if audio_base64_string:
-            # Convert base64 audio to audio data
-            audio_data = base64.b64decode(audio_base64_string)
-            audio_io = BytesIO(audio_data)
- 
-            pause_count = get_pause_count(audio_io)
+   # Convert base64 audio to audio data
+  
+   if data.base64_string:
 
-            # Proceed with existing process
-            denoised_audio, sample_rate, initial_snr, final_snr = denoise_audio(audio_io, speed_factor=0.75)
-            denoised_audio_base64 = convert_to_base64(denoised_audio, sample_rate)
+    audio_base64_string = data.base64_string
+    audio_data = base64.b64decode(audio_base64_string)
+   
+    pause_count = 0
+    denoised_audio_base64 = ""
 
-            # Delete audio data from cache
-            del audio_data
-            del audio_io
- 
-            return {
-                "denoised_audio_base64": denoised_audio_base64,
-                "pause_count": pause_count
-                }
-        else:
-            return {"error": "Missing audio_base64 parameter."}
-    else:
-        return {"error": "No data received."}
+    if data.enablePauseCount:
+        pause_count = get_pause_count(io.BytesIO(audio_data))
+
+    if data.enableDenoiser:
+        # Proceed with denoising process
+        denoised_audio, sample_rate, initial_snr, final_snr = denoise_audio(io.BytesIO(audio_data), speed_factor=0.75)
+        # Convert denoised audio to base64 string
+        denoised_audio_base64 = convert_to_base64(denoised_audio, sample_rate)
+
+    return {
+        "denoised_audio_base64": denoised_audio_base64,
+        "pause_count": pause_count
+    }

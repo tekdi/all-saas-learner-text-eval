@@ -10,6 +10,7 @@ import librosa
 import numpy as np
 import soundfile as sf
 import noisereduce as nr
+import ffmpeg
 
 english_phoneme = ["b","d","f","g","h","ʤ","k","l","m","n","p","r","s","t","v","w","z","ʒ","tʃ","ʃ","θ","ð","ŋ","j","æ","eɪ","ɛ","i:","ɪ","aɪ","ɒ","oʊ","ʊ","ʌ","u:","ɔɪ","aʊ","ə","eəʳ","ɑ:","ɜ:ʳ","ɔ:","ɪəʳ","ʊəʳ","i","u","ɔ","ɑ","ɜ","e","ʧ","o","y","a", "x", "c"]
 anamoly_list = {}
@@ -141,24 +142,24 @@ def get_error_arrays(alignments, reference, hypothesis):
         'substitution': substitution, 
     }
 
+def get_pause_count(audio_file):
+        # Run the FFmpeg command with the input from the byte stream
+        process = (
+            ffmpeg
+            .input('pipe:0')
+            .filter('silencedetect', noise='-40dB', duration=0.5)
+            .output('pipe:1', format='null')
+            .run_async(pipe_stdin=True, pipe_stdout=True, pipe_stderr=True)
+        )
+        # Write the audio data to the stdin of the FFmpeg process
+        stdout, stderr = process.communicate(input=audio_file.read())
 
-def get_pause_count(audio_io):
-    # Load audio data from base64 string
-    audio_segment = AudioSegment.from_file((audio_io))
+        # Parse the stderr output to count the silences
+        silence_lines = stderr.decode().split('\n')
+        silence_start_count = sum(1 for line in silence_lines if "silence_start" in line)
+       
+        return silence_start_count
 
-    # Check if the audio is completely silent or empty
-    silence_ranges = detect_silence(
-        audio_segment, min_silence_len=500, silence_thresh=-40)
-
-    # Count pause occurrences
-    if len(silence_ranges) == 1 and silence_ranges[0] == [0, len(audio_segment)]:
-        pause_count = 0
-    else:
-        pause_count = len(silence_ranges)
-
-    return pause_count
-
-   
 def find_closest_match(target_word, input_string):
     # Tokenize the input string into words
     words = input_string.lower().split()
