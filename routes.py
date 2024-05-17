@@ -1,8 +1,8 @@
 import base64
-from io import BytesIO
+import io
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from utils import  denoise_with_rnnoise, get_error_arrays, split_into_phonemes, processLP
+from utils import  denoise_with_rnnoise, get_error_arrays, get_pause_count, split_into_phonemes, processLP
 from schemas import TextData,audioData,PhonemesRequest, PhonemesResponse, ErrorArraysResponse
 from typing import List
 import jiwer
@@ -14,7 +14,6 @@ router = APIRouter()
 async def compute_errors(data: TextData):
     reference = data.reference
     hypothesis = data.hypothesis
-    base64_string = data.base64_string
     language = data.language
 
     charOut = jiwer.process_characters(reference, hypothesis)
@@ -29,7 +28,7 @@ async def compute_errors(data: TextData):
 
     # Extract error arrays
     error_arrays = get_error_arrays(
-        charOut.alignments, reference, hypothesis, base64_string)
+        charOut.alignments, reference, hypothesis)
 
     return {
         "wer": wer,
@@ -40,27 +39,39 @@ async def compute_errors(data: TextData):
         "deletion_count": len(error_arrays['deletion']),
         "substitution": error_arrays['substitution'],
         "substitution_count": len(error_arrays['substitution']),
-        "pause_count": error_arrays['pause_count'],
         "confidence_char_list":confidence_char_list,
         "missing_char_list":missing_char_list,
         "construct_text":construct_text
     }
+
 
 @router.post("/getPhonemes", response_model=dict)
 async def get_phonemes(data: PhonemesRequest):
     phonemesList = split_into_phonemes(p.convert(data.text))
     return {"phonemes": phonemesList}
 
+
 @router.post('/audio_processing')
 async def audio_processing(data: audioData):
-    audio_base64 = data.audio_base64
-    # Use the correct absolute path for the model folder
-    denoised_audio_base64 = denoise_with_rnnoise(audio_base64)
+    audio_data = data.base64_string
+    # Decode base64 to get the audio data
+    audio_bytes = base64.b64decode(audio_data)
+    audio_io = io.BytesIO(audio_bytes)
 
+    pause_count = 0
+    denoised_audio_base64 = ""
+
+    if data.enablePauseCount:
+     pause_count = get_pause_count(audio_io)
+     
+    if data.enableDenoiser:
+        # Use the correct absolute path for the model folder
+        denoised_audio_base64 = denoise_with_rnnoise(audio_data)
+         
     if denoised_audio_base64 is None:
         raise HTTPException(status_code=500, detail="Error during audio denoising")
 
-    # Clear cache
-    del audio_base64
-
-    return {"denoised_audio_base64": denoised_audio_base64}
+    return {
+        "denoised_audio_base64": denoised_audio_base64,
+        "pause_count": pause_count
+    }
