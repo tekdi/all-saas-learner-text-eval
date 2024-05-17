@@ -1,21 +1,54 @@
-# Dockerfile
-
 # Use the official Python image as the base image
 FROM python:3.10-slim-buster
 
-# Install FFmpeg
+# Install dependencies for building Python packages and FFmpeg
 RUN apt-get update && \
-    apt-get install -y ffmpeg && \
+    apt-get install -y \
+    build-essential \
+    gcc \
+    libssl-dev \
+    libffi-dev \
+    python3-dev \
+    autoconf \
+    automake \
+    cmake \
+    git-core \
+    libass-dev \
+    libfreetype6-dev \
+    libsdl2-dev \
+    libtool \
+    libva-dev \
+    libvdpau-dev \
+    libvorbis-dev \
+    libxcb1-dev \
+    libxcb-shm0-dev \
+    libxcb-xfixes0-dev \
+    pkg-config \
+    texinfo \
+    wget \
+    zlib1g-dev \
+    nasm \
+    yasm && \
     rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
 WORKDIR /app
 
+# Install FFmpeg
+# Install dependencies and the latest FFmpeg
+RUN apt-get update && \
+    apt-get install -y wget xz-utils && \
+    wget -O /tmp/ffmpeg-release-amd64-static.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz && \
+    tar -xf /tmp/ffmpeg-release-amd64-static.tar.xz -C /tmp && \
+    mv /tmp/ffmpeg-*-static/ffmpeg /usr/local/bin/ && \
+    mv /tmp/ffmpeg-*-static/ffprobe /usr/local/bin/ && \
+    rm -rf /tmp/ffmpeg-*-static /var/lib/apt/lists/*
+
 # Copy the requirements file and install dependencies
 COPY requirements.txt .
 
 # Install app dependencies
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all the files to the container
 COPY . .
@@ -24,4 +57,4 @@ COPY . .
 EXPOSE $PORT
 
 # Command to run the Flask application
-CMD ["python", "app.py","--host","0.0.0.0"]
+CMD ["python", "app.py", "--host", "0.0.0.0"]
