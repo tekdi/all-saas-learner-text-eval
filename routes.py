@@ -2,7 +2,7 @@ import base64
 from io import BytesIO
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from utils import convert_to_base64, denoise_audio, get_error_arrays, split_into_phonemes, processLP
+from utils import  denoise_with_rnnoise, get_error_arrays, split_into_phonemes, processLP
 from schemas import TextData,audioData,PhonemesRequest, PhonemesResponse, ErrorArraysResponse
 from typing import List
 import jiwer
@@ -53,23 +53,14 @@ async def get_phonemes(data: PhonemesRequest):
 
 @router.post('/audio_processing')
 async def audio_processing(data: audioData):
-    if data.audio_base64:
-        audio_base64_string = data.audio_base64
-        if audio_base64_string:
-            # Convert base64 audio to audio data
-            audio_data = base64.b64decode(audio_base64_string)
-            audio_io = BytesIO(audio_data)
+    audio_base64 = data.audio_base64
+    # Use the correct absolute path for the model folder
+    denoised_audio_base64 = denoise_with_rnnoise(audio_base64)
 
-            # Proceed with existing process
-            denoised_audio, sample_rate, initial_snr, final_snr = denoise_audio(audio_io, speed_factor=0.75)
-            denoised_audio_base64 = convert_to_base64(denoised_audio, sample_rate)
+    if denoised_audio_base64 is None:
+        raise HTTPException(status_code=500, detail="Error during audio denoising")
 
-            # Delete audio data from cache
-            del audio_data
-            del audio_io
+    # Clear cache
+    del audio_base64
 
-            return {"denoised_audio_base64": denoised_audio_base64}
-        else:
-            return {"error": "Missing audio_base64 parameter."}
-    else:
-        return {"error": "No data received."}
+    return {"denoised_audio_base64": denoised_audio_base64}
