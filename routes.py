@@ -62,14 +62,14 @@ async def audio_processing(data: audioData):
     denoised_audio_base64 = ""
 
     if data.enablePauseCount:
-     pause_count = get_pause_count(audio_io)
-     
+        pause_count = get_pause_count(audio_io)  # Implement this function as needed
+
     if data.enableDenoiser:
-        # Use the correct absolute path for the model folder
-        denoised_audio_base64 = denoise_with_rnnoise(audio_data)
+        # If custom values are needed, specify here; otherwise, use defaults
+        denoised_audio_base64 = denoise_with_rnnoise(audio_data, data.contentType)
          
-    if denoised_audio_base64 is None:
-        raise HTTPException(status_code=500, detail="Error during audio denoising")
+        if denoised_audio_base64 is None:
+            raise HTTPException(status_code=500, detail="Error during audio denoising")
 
     return {
         "denoised_audio_base64": denoised_audio_base64,

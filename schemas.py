@@ -11,6 +11,7 @@ class audioData(BaseModel):
     base64_string: str
     enablePauseCount:bool
     enableDenoiser:bool
+    contentType: str
 
 class PhonemesRequest(BaseModel):
     text: str
