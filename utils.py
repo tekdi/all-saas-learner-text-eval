@@ -16,27 +16,36 @@ import noisereduce as nr
 english_phoneme = ["b","d","f","g","h","ʤ","k","l","m","n","p","r","s","t","v","w","z","ʒ","tʃ","ʃ","θ","ð","ŋ","j","æ","eɪ","ɛ","i:","ɪ","aɪ","ɒ","oʊ","ʊ","ʌ","u:","ɔɪ","aʊ","ə","eəʳ","ɑ:","ɜ:ʳ","ɔ:","ɪəʳ","ʊəʳ","i","u","ɔ","ɑ","ɜ","e","ʧ","o","y","a", "x", "c"]
 anamoly_list = {}
 
-def denoise_with_rnnoise(audio_base64):
+def denoise_with_rnnoise(audio_base64, content_type, padding_duration=0.1, time_stretch_factor=0.75):
     try:
         # Decode base64 to get the audio data
         audio_data = base64.b64decode(audio_base64)
         audio_io = io.BytesIO(audio_data)
+        input_audio = audio_io.read()
 
-        # Construct the full model path
+        # Path to the RNNoise model
         model_path = "./audio_model/cb.rnnn"
 
-        # Process the audio with RNNoise using ffmpeg
+        # Create the ffmpeg filter chain
+        filter_chain = []
+        if content_type == 'Word' or content_type == 'word':
+            filter_chain.append(f'apad=pad_dur={padding_duration}')
+            filter_chain.append(f'apad=pad_dur={padding_duration}')
+        filter_chain.append(f'atempo={time_stretch_factor}')
+        filter_chain_str = ','.join(filter_chain)
+
+        # Apply the filters and denoise
         output, _ = (
             ffmpeg
-            .input('pipe:', format='wav', acodec='pcm_s16le', ac=1)
-            .output('pipe:', format='wav', af=f'arnndn=m={model_path}')
-            .run(input=audio_io.read(), capture_stdout=True, capture_stderr=True)
+            .input('pipe:')
+            .output('pipe:', format='wav', af=f'{filter_chain_str},arnndn=m={model_path}')
+            .run(input=input_audio, capture_stdout=True, capture_stderr=True)
         )
 
         # Convert the processed output back to base64
         denoised_audio_base64 = base64.b64encode(output).decode('utf-8')
         
-        # Clear cache
+        # Clear cache to free memory
         del audio_data
         del audio_io
 

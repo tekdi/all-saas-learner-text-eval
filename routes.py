@@ -54,7 +54,6 @@ async def get_phonemes(data: PhonemesRequest):
 @router.post('/audio_processing')
 async def audio_processing(data: audioData):
     audio_data = data.base64_string
-    # Decode base64 to get the audio data
     audio_bytes = base64.b64decode(audio_data)
     audio_io = io.BytesIO(audio_bytes)
 
@@ -62,15 +61,11 @@ async def audio_processing(data: audioData):
     denoised_audio_base64 = ""
 
     if data.enablePauseCount:
-     pause_count = get_pause_count(audio_io)
-     
+        pause_count = get_pause_count(audio_io)
     if data.enableDenoiser:
-        # Use the correct absolute path for the model folder
-        denoised_audio_base64 = denoise_with_rnnoise(audio_data)
-         
-    if denoised_audio_base64 is None:
-        raise HTTPException(status_code=500, detail="Error during audio denoising")
-
+        denoised_audio_base64 = denoise_with_rnnoise(audio_data, data.contentType)
+        if denoised_audio_base64 is None:
+            raise HTTPException(status_code=500, detail="Error during audio denoising")
     return {
         "denoised_audio_base64": denoised_audio_base64,
         "pause_count": pause_count
