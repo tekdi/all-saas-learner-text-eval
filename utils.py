@@ -19,7 +19,11 @@ anamoly_list = {}
 def denoise_with_rnnoise(audio_base64, content_type, padding_duration=0.1, time_stretch_factor=0.75):
     try:
         # Decode base64 to get the audio data
-        audio_data = base64.b64decode(audio_base64)
+        try:
+            audio_data = base64.b64decode(audio_base64)
+        except base64.binascii.Error as e:
+            raise ValueError(f"Invalid base64 string: {str(e)}")
+
         audio_io = io.BytesIO(audio_data)
         input_audio = audio_io.read()
 
@@ -28,40 +32,64 @@ def denoise_with_rnnoise(audio_base64, content_type, padding_duration=0.1, time_
 
         # Create the ffmpeg filter chain
         filter_chain = []
-        if content_type == 'Word' or content_type == 'word':
+        if content_type.lower() == 'word':
             filter_chain.append(f'apad=pad_dur={padding_duration}')
             filter_chain.append(f'apad=pad_dur={padding_duration}')
         filter_chain.append(f'atempo={time_stretch_factor}')
         filter_chain_str = ','.join(filter_chain)
 
         # Apply the filters and denoise
-        output, _ = (
-            ffmpeg
-            .input('pipe:')
-            .output('pipe:', format='wav', af=f'{filter_chain_str},arnndn=m={model_path}')
-            .run(input=input_audio, capture_stdout=True, capture_stderr=True)
-        )
+        try:
+            output, _ = (
+                ffmpeg
+                .input('pipe:', format='wav')
+                .output('pipe:', format='wav', af=f'{filter_chain_str},arnndn=m={model_path}')
+                .run(input=input_audio, capture_stdout=True, capture_stderr=True)
+            )
+        except ffmpeg.Error as e:
+            raise RuntimeError(f"Error during noise reduction with FFmpeg: {e.stderr.decode()}")
 
         # Convert the processed output back to base64
-        denoised_audio_base64 = base64.b64encode(output).decode('utf-8')
+        try:
+            denoised_audio_base64 = base64.b64encode(output).decode('utf-8')
+        except Exception as e:
+            raise RuntimeError(f"Error encoding output to base64: {str(e)}")
         
         # Clear cache to free memory
         del audio_data
         del audio_io
 
         return denoised_audio_base64
-    
-    except ffmpeg.Error as e:
-        print(f"Error during noise reduction: {e.stderr.decode()}")
-        return None
-                 
-def convert_to_base64(audio_data, sample_rate):
-    buffer = io.BytesIO()
-    sf.write(buffer, audio_data, sample_rate, format='wav')
-    buffer.seek(0)
-    base64_audio = base64.b64encode(buffer.read()).decode('utf-8')
-    return base64_audio
 
+    except ValueError as e:
+        print(f"Value error in denoise_with_rnnoise: {str(e)}")
+        raise
+    except RuntimeError as e:
+        print(f"Runtime error in denoise_with_rnnoise: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error in denoise_with_rnnoise: {str(e)}")
+        raise
+
+def convert_to_base64(audio_data, sample_rate):
+    try:
+        buffer = io.BytesIO()
+        try:
+            sf.write(buffer, audio_data, sample_rate, format='wav')
+        except Exception as e:
+            raise RuntimeError(f"Error writing audio data to buffer: {str(e)}")
+
+        buffer.seek(0)
+        try:
+            base64_audio = base64.b64encode(buffer.read()).decode('utf-8')
+        except Exception as e:
+            raise RuntimeError(f"Error encoding buffer to base64: {str(e)}")
+
+        return base64_audio
+    except Exception as e:
+        print(f"Error in convert_to_base64: {str(e)}")
+        return {"error": str(e)}
+       
 def get_error_arrays(alignments, reference, hypothesis):
     insertion = []
     deletion = []
