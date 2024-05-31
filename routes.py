@@ -26,6 +26,11 @@ async def compute_errors(data: TextData):
         hypothesis = data.hypothesis
         language = data.language
 
+        # Validate language
+        allowed_languages = {"en", "ta", "te", "kn", "hi"}
+        if language not in allowed_languages:
+            raise HTTPException(status_code=400, detail=f"Unsupported language: {language}. Supported languages are: {', '.join(allowed_languages)}")
+
         # Process character-level differences
         try:
             charOut = jiwer.process_characters(reference, hypothesis)
