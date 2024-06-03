@@ -4,7 +4,6 @@ from typing import List, Optional
 class TextData(BaseModel):
     reference: str
     hypothesis: str
-    base64_string: str
     language: str
 
 class audioData(BaseModel):
