@@ -19,11 +19,11 @@ router = APIRouter()
 async def compute_errors(data: TextData):
     try:
         # Validate input data
-        if not data.reference or not data.hypothesis:
-            raise HTTPException(status_code=400, detail="Reference and hypothesis texts must be provided.")
+        if not data.reference:
+            raise HTTPException(status_code=400, detail="Reference text must be provided.")
 
         reference = data.reference
-        hypothesis = data.hypothesis
+        hypothesis = data.hypothesis if data.hypothesis is not None else ""
         language = data.language
 
         # Validate language
