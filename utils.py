@@ -1,17 +1,10 @@
 import base64
 import io
 import ffmpeg
-import os
 from functools import lru_cache
-from pydub import AudioSegment
-from pydub.silence import detect_silence
 import eng_to_ipa as p
 from fuzzywuzzy import fuzz
-import jiwer
-import librosa
-import numpy as np
 import soundfile as sf
-import noisereduce as nr
 
 english_phoneme = ["b","d","f","g","h","ʤ","k","l","m","n","p","r","s","t","v","w","z","ʒ","tʃ","ʃ","θ","ð","ŋ","j","æ","eɪ","ɛ","i:","ɪ","aɪ","ɒ","oʊ","ʊ","ʌ","u:","ɔɪ","aʊ","ə","eəʳ","ɑ:","ɜ:ʳ","ɔ:","ɪəʳ","ʊəʳ","i","u","ɔ","ɑ","ɜ","e","ʧ","o","y","a", "x", "c"]
 anamoly_list = {}
