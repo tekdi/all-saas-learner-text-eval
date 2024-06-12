@@ -2,7 +2,10 @@ import os
 from fastapi import FastAPI
 from routes import router
 
-app = FastAPI()
+app = FastAPI(
+    docs_url='/api/docs',
+    openapi_url='/api/openapi.json'
+)
 
 app.include_router(router)
 
