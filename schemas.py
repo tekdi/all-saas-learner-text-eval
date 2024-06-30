@@ -1,10 +1,11 @@
 from pydantic import BaseModel,Field
-from typing import List, Optional, Dict 
+from typing import List, Optional, Dict
 
 class TextData(BaseModel):
     reference: str = Field(..., example="frog jumps", description="The reference text to compare against.")
     hypothesis: Optional[str] = Field(None, example="dog jumps", description="The hypothesis text to be compared.")
     language: str = Field(..., example="en", description="The language of the text.")
+    construct_text:str
 
 class audioData(BaseModel):
     base64_string: str = Field(..., example="UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YUAA", description="Base64 encoded audio string.")

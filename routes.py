@@ -58,6 +58,7 @@ async def compute_errors(data: TextData):
         reference = data.reference
         hypothesis = data.hypothesis if data.hypothesis is not None else ""
         language = data.language
+        construct_text = data.construct_text
 
         # Validate language
         allowed_languages = {"en", "ta", "te", "kn", "hi"}
@@ -80,11 +81,10 @@ async def compute_errors(data: TextData):
 
         confidence_char_list = []
         missing_char_list = []
-        construct_text = ""
 
         if language == "en":
             try:
-                confidence_char_list, missing_char_list, construct_text = processLP(reference, hypothesis)
+                confidence_char_list, missing_char_list = processLP(reference, hypothesis,construct_text)
             except Exception as e:
                 logger.error(f"Error processing LP: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Error processing LP: {str(e)}")
@@ -114,7 +114,7 @@ async def compute_errors(data: TextData):
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-    
+
 @router.post("/getPhonemes", response_model=PhonemesResponse, summary="Get Phonemes", description="Converts text into phonemes.", responses={
     400: {
         "description": "Bad Request",
@@ -161,7 +161,7 @@ async def get_phonemes(data: PhonemesRequest):
     except Exception as e:
         logger.error(f"Error getting phonemes: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting phonemes: {str(e)}")
-    
+
 @router.post('/audio_processing', response_model=AudioProcessingResponse, summary="Process Audio", description="Processes audio by denoising and detecting pauses.", responses={
     400: {
         "description": "Bad Request",
@@ -203,7 +203,7 @@ async def audio_processing(data: audioData):
             raise HTTPException(status_code=400, detail="Base64 string of audio must be provided.")
         if not data.contentType:
             raise HTTPException(status_code=400, detail="Content type must be specified.")
-        
+
         try:
             audio_data = data.base64_string
             audio_bytes = base64.b64decode(audio_data)
