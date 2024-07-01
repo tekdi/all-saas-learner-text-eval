@@ -56,9 +56,8 @@ async def compute_errors(data: TextData):
             raise HTTPException(status_code=400, detail="Reference text must be provided.")
 
         reference = data.reference
-        hypothesis = data.hypothesis if data.hypothesis is not None else ""
         language = data.language
-        construct_text = data.construct_text
+        construct_text = data.construct_text  if data.hypothesis is not None else ""
 
         # Validate language
         allowed_languages = {"en", "ta", "te", "kn", "hi"}
@@ -67,14 +66,14 @@ async def compute_errors(data: TextData):
 
         # Process character-level differences
         try:
-            charOut = jiwer.process_characters(reference, hypothesis)
+            charOut = jiwer.process_characters(reference, construct_text)
         except Exception as e:
             logger.error(f"Error processing characters: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error processing characters: {str(e)}")
 
         # Compute WER
         try:
-            wer = jiwer.wer(reference, hypothesis)
+            wer = jiwer.wer(reference, construct_text)
         except Exception as e:
             logger.error(f"Error computing WER: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error computing WER: {str(e)}")
@@ -91,7 +90,7 @@ async def compute_errors(data: TextData):
 
         # Extract error arrays
         try:
-            error_arrays = get_error_arrays(charOut.alignments, reference, hypothesis)
+            error_arrays = get_error_arrays(charOut.alignments, reference, construct_text)
         except Exception as e:
             logger.error(f"Error extracting error arrays: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error extracting error arrays: {str(e)}")
