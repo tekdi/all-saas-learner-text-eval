@@ -206,22 +206,21 @@ def split_into_phonemes(token):
 
     return ph_list
 
-def identify_missing_tokens(orig_text, resp_text,construct_text):
+def identify_missing_tokens(orig_text, construct_text):
     # Splitting text into words
     orig_word_list = orig_text.lower().split()
-    resp_word_list = construct_text.lower().split()
+    construct_word_list = construct_text.lower().split()
     # construct_word_list = construct_text.lower().split()
 
     # Initialize lists and dictionaries
-    construct_word_list = []
+    #construct_word_list = []
     missing_word_list = []
     orig_phoneme_list = []
     construct_phoneme_list = []
     missing_phoneme_list = []
-    construct_text_list = []
 
-    # Precompute phonemes for response words for quick lookup
-    construct_phonemes = {word: p.convert(word) for word in resp_word_list}
+    # Precompute phonemes for construct words for quick lookup
+    construct_phonemes = {word: p.convert(word) for word in construct_word_list}
     # print("resp_phoneme::", resp_phonemes)
     for word in orig_word_list:
         # Precompute original word phonemes
@@ -229,13 +228,11 @@ def identify_missing_tokens(orig_text, resp_text,construct_text):
 
         # Find closest match based on precomputed phonemes to avoid redundant calculations
         closest_match, similarity_score = find_closest_match(word, construct_text.lower())
-        print(closest_match, similarity_score)
+
         # Check similarity and categorize word
         if similarity_score > 85:
-            construct_word_list.append(closest_match)
             p_closest_match = construct_phonemes[closest_match]
             construct_phoneme_list.append(split_into_phonemes(p_closest_match))
-            construct_text_list.append(closest_match)
         else:
             missing_word_list.append(word)
             p_word_phonemes = split_into_phonemes(p_word)
@@ -244,18 +241,14 @@ def identify_missing_tokens(orig_text, resp_text,construct_text):
         # Store original phonemes for each word
         orig_phoneme_list.append(split_into_phonemes(p_word))
 
-    # Convert list of words to a single string
-    # construct_text = ' '.join(construct_text_list)
-
     # Efficiently deduplicate and flatten phoneme lists
-    #orig_flatList = set(phoneme for sublist in orig_phoneme_list for phoneme in sublist)
     missing_flatList = set(phoneme for sublist in missing_phoneme_list for phoneme in sublist)
     construct_flatList = set(phoneme for sublist in construct_phoneme_list for phoneme in sublist)
 
     return list(construct_flatList), list(missing_flatList)
 
-def processLP(orig_text, resp_text,construct_text):
-    cons_list, miss_list = identify_missing_tokens(orig_text, resp_text)
+def processLP(orig_text, construct_text):
+    cons_list, miss_list = identify_missing_tokens(orig_text, construct_text)
 
     #remove phonemes from miss_list which are in cons_list, ?but add those phonemes a count of could be issue
 

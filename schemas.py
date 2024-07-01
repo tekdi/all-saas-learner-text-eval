@@ -28,7 +28,6 @@ class ErrorArraysResponse(BaseModel):
     deletion_count: int = Field(..., example=1, description="Count of deletions.")
     substitution: List[Dict[str, str]] = Field(..., example=[{"removed": "d", "replaced": "f"}], description="List of substitutions.")
     substitution_count: int = Field(..., example=1, description="Count of substitutions.")
-    pause_count: Optional[int] = Field(None, example=None, description="Count of pauses detected.")
     confidence_char_list: Optional[List[str]] = Field(None, example=["p", "ʤ", "s", "ə", "m"], description="List of characters with confidence levels.")
     missing_char_list: Optional[List[str]] = Field(None, example=["f", "g", "r", "ɑ"], description="List of missing characters.")
     construct_text: Optional[str] = Field(None, example="jumps", description="Constructed text based on the hypothesis.")

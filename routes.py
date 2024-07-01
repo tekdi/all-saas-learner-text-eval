@@ -84,7 +84,7 @@ async def compute_errors(data: TextData):
 
         if language == "en":
             try:
-                confidence_char_list, missing_char_list = processLP(reference, hypothesis,construct_text)
+                confidence_char_list, missing_char_list = processLP(reference, construct_text)
             except Exception as e:
                 logger.error(f"Error processing LP: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Error processing LP: {str(e)}")
