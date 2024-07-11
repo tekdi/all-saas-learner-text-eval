@@ -1,10 +1,11 @@
 from pydantic import BaseModel,Field
-from typing import List, Optional, Dict 
+from typing import List, Optional, Dict
 
 class TextData(BaseModel):
     reference: str = Field(..., example="frog jumps", description="The reference text to compare against.")
     hypothesis: Optional[str] = Field(None, example="dog jumps", description="The hypothesis text to be compared.")
     language: str = Field(..., example="en", description="The language of the text.")
+    construct_text:str
 
 class audioData(BaseModel):
     base64_string: str = Field(..., example="UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YUAA", description="Base64 encoded audio string.")
@@ -27,7 +28,6 @@ class ErrorArraysResponse(BaseModel):
     deletion_count: int = Field(..., example=1, description="Count of deletions.")
     substitution: List[Dict[str, str]] = Field(..., example=[{"removed": "d", "replaced": "f"}], description="List of substitutions.")
     substitution_count: int = Field(..., example=1, description="Count of substitutions.")
-    pause_count: Optional[int] = Field(None, example=None, description="Count of pauses detected.")
     confidence_char_list: Optional[List[str]] = Field(None, example=["p", "ʤ", "s", "ə", "m"], description="List of characters with confidence levels.")
     missing_char_list: Optional[List[str]] = Field(None, example=["f", "g", "r", "ɑ"], description="List of missing characters.")
     construct_text: Optional[str] = Field(None, example="jumps", description="Constructed text based on the hypothesis.")

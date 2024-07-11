@@ -47,7 +47,7 @@ def denoise_with_rnnoise(audio_base64, content_type, padding_duration=0.1, time_
             denoised_audio_base64 = base64.b64encode(output).decode('utf-8')
         except Exception as e:
             raise RuntimeError(f"Error encoding output to base64: {str(e)}")
-        
+
         # Clear cache to free memory
         del audio_data
         del audio_io
@@ -82,7 +82,7 @@ def convert_to_base64(audio_data, sample_rate):
     except Exception as e:
         print(f"Error in convert_to_base64: {str(e)}")
         return {"error": str(e)}
-       
+
 def get_error_arrays(alignments, reference, hypothesis):
     insertion = []
     deletion = []
@@ -110,7 +110,7 @@ def get_error_arrays(alignments, reference, hypothesis):
     return {
         'insertion': insertion_chars,
         'deletion': deletion_chars,
-        'substitution': substitution, 
+        'substitution': substitution,
     }
 
 def get_pause_count(audio_io):
@@ -136,16 +136,16 @@ def find_closest_match(target_word, input_string):
     # Initialize variables to keep track of the best match
     best_match = None
     best_score = 0
-    
+
     # Iterate through the words in the input string
     for word in words:
         similarity_score = fuzz.ratio(targ, word)
-        
+
         # Update the best match if a higher score is found
         if similarity_score > best_score:
             best_score = similarity_score
             best_match = word
-    
+
     return best_match, best_score
 
 @lru_cache(maxsize=None)
@@ -167,13 +167,13 @@ def split_into_phonemes(token):
         "ɔ:": "ɔ:",
         "i:": "i",
     }
-    
+
     # Set of characters to skip (stress marks, etc.)
     skip_chars = {"'", " ", "ˈ", "ˌ"}
 
     # Convert the english_phoneme list into a set for O(1) average-time complexity checks
     english_phoneme_set = set(english_phoneme)
-    
+
     ph_list = []
     word_list = token.split()  # split by whitespace (space, tab, newline, etc.)
 
@@ -206,55 +206,49 @@ def split_into_phonemes(token):
 
     return ph_list
 
-def identify_missing_tokens(orig_text, resp_text):
+def identify_missing_tokens(orig_text, construct_text):
     # Splitting text into words
     orig_word_list = orig_text.lower().split()
-    resp_word_list = resp_text.lower().split()
-    
+    construct_word_list = construct_text.lower().split()
+    # construct_word_list = construct_text.lower().split()
+
     # Initialize lists and dictionaries
-    construct_word_list = []
+    #construct_word_list = []
     missing_word_list = []
     orig_phoneme_list = []
     construct_phoneme_list = []
     missing_phoneme_list = []
-    construct_text = []
-    
-    # Precompute phonemes for response words for quick lookup
-    resp_phonemes = {word: p.convert(word) for word in resp_word_list}
-    print("resp_phoneme::", resp_phonemes)
+
+    # Precompute phonemes for construct words for quick lookup
+    construct_phonemes = {word: p.convert(word) for word in construct_word_list}
+    # print("resp_phoneme::", resp_phonemes)
     for word in orig_word_list:
         # Precompute original word phonemes
         p_word = p.convert(word)
-        
+
         # Find closest match based on precomputed phonemes to avoid redundant calculations
-        closest_match, similarity_score = find_closest_match(word, resp_text)
-        
+        closest_match, similarity_score = find_closest_match(word, construct_text.lower())
+
         # Check similarity and categorize word
-        if similarity_score > 80:
-            construct_word_list.append(closest_match)
-            p_closest_match = resp_phonemes[closest_match]
+        if similarity_score > 85:
+            p_closest_match = construct_phonemes[closest_match]
             construct_phoneme_list.append(split_into_phonemes(p_closest_match))
-            construct_text.append(closest_match)
         else:
             missing_word_list.append(word)
             p_word_phonemes = split_into_phonemes(p_word)
             missing_phoneme_list.append(p_word_phonemes)
-        
+
         # Store original phonemes for each word
         orig_phoneme_list.append(split_into_phonemes(p_word))
 
-    # Convert list of words to a single string
-    construct_text = ' '.join(construct_text)
-
     # Efficiently deduplicate and flatten phoneme lists
-    #orig_flatList = set(phoneme for sublist in orig_phoneme_list for phoneme in sublist)
     missing_flatList = set(phoneme for sublist in missing_phoneme_list for phoneme in sublist)
     construct_flatList = set(phoneme for sublist in construct_phoneme_list for phoneme in sublist)
 
-    return list(construct_flatList), list(missing_flatList) ,construct_text
+    return list(construct_flatList), list(missing_flatList)
 
-def processLP(orig_text, resp_text):
-    cons_list, miss_list, construct_text = identify_missing_tokens(orig_text, resp_text)
+def processLP(orig_text, construct_text):
+    cons_list, miss_list = identify_missing_tokens(orig_text, construct_text)
 
     #remove phonemes from miss_list which are in cons_list, ?but add those phonemes a count of could be issue
 
@@ -266,4 +260,4 @@ def processLP(orig_text, resp_text):
             unfamiliar_list.append(c)
     #function to calculate wer cer, substitutions, deletions and insertions, silence, repetitions
     #insert into DB the LearnerProfile vector
-    return cons_list, miss_list,construct_text
+    return cons_list, miss_list
