@@ -220,8 +220,7 @@ def identify_missing_tokens(orig_text, resp_text):
     construct_text = []
     
     # Precompute phonemes for response words for quick lookup
-    resp_phonemes = {word: p.convert(word) for word in resp_word_list}
-    print("resp_phoneme::", resp_phonemes)
+    resp_phonemes = {word: p.convert(word).replace('*','') for word in resp_word_list}
     for word in orig_word_list:
         # Precompute original word phonemes
         p_word = p.convert(word)
